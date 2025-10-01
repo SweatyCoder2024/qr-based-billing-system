@@ -18,7 +18,6 @@ class APIClient:
         return None
 
     def get_items(self, limit: int = 1000, skip: int = 0) -> List[Dict]:
-        """Fetches all items from the backend API."""
         try:
             url = f"{self.base_url}/api/items/?limit={limit}&skip={skip}"
             response = self.session.get(url)
@@ -29,7 +28,6 @@ class APIClient:
             return []
 
     def get_item(self, item_id: int) -> Optional[Dict]:
-        """Fetches a single item by its ID."""
         try:
             response = self.session.get(f"{self.base_url}/api/items/{item_id}")
             response.raise_for_status()
@@ -39,7 +37,6 @@ class APIClient:
             return None
 
     def create_item(self, item_data: Dict) -> Optional[Dict]:
-        """Sends a request to create a new item."""
         try:
             response = self.session.post(f"{self.base_url}/api/items/", json=item_data)
             response.raise_for_status()
@@ -48,7 +45,6 @@ class APIClient:
             return self._handle_error(e)
 
     def update_item(self, item_id: int, item_data: Dict) -> Optional[Dict]:
-        """Sends a request to update an item."""
         try:
             response = self.session.put(f"{self.base_url}/api/items/{item_id}", json=item_data)
             response.raise_for_status()
@@ -57,7 +53,6 @@ class APIClient:
             return self._handle_error(e)
 
     def delete_item(self, item_id: int) -> bool:
-        """Sends a request to delete an item."""
         try:
             response = self.session.delete(f"{self.base_url}/api/items/{item_id}")
             response.raise_for_status()
@@ -67,7 +62,6 @@ class APIClient:
             return False
 
     def create_session(self) -> Dict:
-        # ... (this function is unchanged)
         try:
             response = self.session.post(f"{self.base_url}/api/sessions/create")
             response.raise_for_status()
@@ -75,3 +69,23 @@ class APIClient:
         except requests.exceptions.RequestException as e:
             print(f"An error occurred creating session: {e}")
             return {}
+
+    def get_dashboard_stats(self) -> Optional[Dict]:
+        try:
+            response = self.session.get(f"{self.base_url}/api/dashboard/stats")
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            self._handle_error(e)
+            return None
+
+    # --- THIS IS THE MISSING FUNCTION ---
+    def get_item_qr(self, item_id: int) -> Optional[Dict]:
+        """Fetches a QR code for a single item."""
+        try:
+            response = self.session.get(f"{self.base_url}/api/items/{item_id}/qr")
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            self._handle_error(e)
+            return None

@@ -20,10 +20,9 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.tabs.setTabPosition(QTabWidget.TabPosition.North)
 
-        # Pass the api_client instance to BOTH the Billing and Items tabs
-        self.billing_tab = BillingTab(self.api_client) # <-- PASS THE CLIENT HERE
+        self.billing_tab = BillingTab(self.api_client)
         self.items_tab = ItemsTab(self.api_client)
-        self.dashboard_tab = DashboardTab()
+        self.dashboard_tab = DashboardTab(self.api_client) # <-- PASS THE CLIENT HERE
 
         self.tabs.addTab(self.billing_tab, "Billing")
         self.tabs.addTab(self.items_tab, "Item Management")

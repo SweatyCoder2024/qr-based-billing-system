@@ -7,34 +7,23 @@ from typing import List
 from ..schemas import item as item_schema
 from ..models import item as item_model
 from ..database import get_db
-from ..services import item_service
-from ..utils.barcode_generator import generate_unique_barcode # <-- ADD THIS IMPORT
+from ..services import item_service, qr_service # <-- Corrected imports
+from ..utils.barcode_generator import generate_unique_barcode
 
 router = APIRouter()
 
-# --- UPDATED create_item FUNCTION ---
 @router.post("/", response_model=item_schema.Item)
 def create_item(item: item_schema.ItemCreate, db: Session = Depends(get_db)):
-    """
-    Create a new item in the database.
-    If qr_code is not provided, one will be generated automatically.
-    """
-    # If qr_code is empty or not provided, generate a new one
     if not item.qr_code:
         item.qr_code = generate_unique_barcode()
-
-    # Check if an item with the same QR code already exists
     db_item = db.query(item_model.Item).filter(item_model.Item.qr_code == item.qr_code).first()
     if db_item:
         raise HTTPException(status_code=409, detail=f"Item with QR code {item.qr_code} already exists")
-
     new_item = item_model.Item(**item.model_dump())
     db.add(new_item)
     db.commit()
     db.refresh(new_item)
     return new_item
-
-# ... (the other functions read_items, upload_file, etc. remain the same) ...
 
 @router.get("/", response_model=List[item_schema.Item])
 def read_items(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
@@ -80,3 +69,13 @@ def delete_item(item_id: int, db: Session = Depends(get_db)):
     db.delete(db_item)
     db.commit()
     return db_item
+
+@router.get("/{item_id}/qr", response_model=dict)
+def get_item_qr(item_id: int, db: Session = Depends(get_db)):
+    db_item = db.query(item_model.Item).filter(item_model.Item.id == item_id).first()
+    if db_item is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    
+    qr_code_str = qr_service.QRService.generate_item_qr(db_item.qr_code)
+    
+    return {"item_name": db_item.name, "qr_code_image": qr_code_str}

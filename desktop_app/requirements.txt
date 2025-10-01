@@ -2,3 +2,5 @@ requests
 websockets
 Pillow
 PyQt6
+qrcode[pil]
+reportlab
