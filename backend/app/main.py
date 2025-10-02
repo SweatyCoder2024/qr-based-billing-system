@@ -36,8 +36,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     try:
         while True:
             data = await websocket.receive_text()
-            await websocket_manager.send_personal_message(
-                {"message": f"Message received: {data}"}, session_id
-            )
+            # The manager now handles getting its own DB session
+            await websocket_manager.handle_message(session_id, data)
     except WebSocketDisconnect:
         websocket_manager.disconnect(session_id)
