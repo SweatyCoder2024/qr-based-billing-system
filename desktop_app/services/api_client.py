@@ -17,7 +17,7 @@ class APIClient:
                 return {"detail": error.response.text}
         return None
 
-    def get_items(self, limit: int = 1000, skip: int = 0) -> List[Dict]:
+    def get_items(self, limit: int = 2000, skip: int = 0) -> List[Dict]:
         try:
             url = f"{self.base_url}/api/items/?limit={limit}&skip={skip}"
             response = self.session.get(url)
@@ -60,6 +60,19 @@ class APIClient:
         except requests.exceptions.RequestException as e:
             self._handle_error(e)
             return False
+    
+    def upload_items_file(self, file_path: str) -> Optional[Dict]:
+        try:
+            with open(file_path, 'rb') as f:
+                files = {'file': (file_path.split('/')[-1], f)}
+                response = self.session.post(f"{self.base_url}/api/items/upload-file/", files=files)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            return self._handle_error(e)
+        except FileNotFoundError:
+            print(f"File not found at path: {file_path}")
+            return {"detail": "File not found on local machine."}
 
     def create_session(self) -> Dict:
         try:
@@ -78,26 +91,43 @@ class APIClient:
         except requests.exceptions.RequestException as e:
             self._handle_error(e)
             return None
-        
-    def upload_items_file(self, file_path: str) -> Optional[Dict]:
-        """Uploads an item file (CSV or XLSX) to the backend."""
+    
+    def get_item_qr(self, item_id: int) -> Optional[Dict]:
         try:
-            with open(file_path, 'rb') as f:
-                files = {'file': (file_path.split('/')[-1], f)}
-                response = self.session.post(f"{self.base_url}/api/items/upload-file/", files=files)
+            response = self.session.get(f"{self.base_url}/api/items/{item_id}/qr")
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
-            return self._handle_error(e)
-        except FileNotFoundError:
-            print(f"File not found at path: {file_path}")
-            return {"detail": "File not found on local machine."}
+            self._handle_error(e)
+            return None
 
-    # --- THIS IS THE MISSING FUNCTION ---
-    def get_item_qr(self, item_id: int) -> Optional[Dict]:
-        """Fetches a QR code for a single item."""
+    # --- NEW FUNCTIONS ---
+    def get_active_sessions(self) -> List[Dict]:
+        """Fetches all active sessions (bills) from the backend."""
         try:
-            response = self.session.get(f"{self.base_url}/api/items/{item_id}/qr")
+            response = self.session.get(f"{self.base_url}/api/sessions/active")
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            self._handle_error(e)
+            return []
+
+    def get_session_qr(self, session_id: str) -> Optional[Dict]:
+        """Fetches the QR code for a specific existing session."""
+        try:
+            response = self.session.get(f"{self.base_url}/api/sessions/{session_id}/qr")
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            self._handle_error(e)
+            return None
+            
+    def get_order_for_session(self, session_id: str) -> Optional[Dict]:
+        """Fetches the pending order for a specific session."""
+        try:
+            response = self.session.get(f"{self.base_url}/api/orders/session/{session_id}")
+            if response.status_code == 404:
+                return None 
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:

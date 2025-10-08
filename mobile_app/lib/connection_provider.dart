@@ -17,18 +17,15 @@ class ConnectionProvider with ChangeNotifier {
 
   void setScannedData(String data) {
     _scannedData = data;
-    print('Data set in provider. Attempting to connect...');
-    connect(); // Automatically try to connect when data is set
+    connect();
     notifyListeners();
   }
 
   void connect() {
     if (_scannedData == null) return;
-
     try {
       final data = jsonDecode(_scannedData!);
       final String? url = data['websocket_url'];
-
       if (url != null) {
         _status = ConnectionStatus.connecting;
         notifyListeners();
@@ -40,19 +37,31 @@ class ConnectionProvider with ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      print('Failed to parse scanned data or connect: $e');
       _status = ConnectionStatus.error;
       notifyListeners();
     }
   }
 
+  void createNewBill() {
+    // Correctly check the status enum, not a non-existent property
+    if (_status == ConnectionStatus.connected) {
+      final message = {
+        "type": "create_new_bill",
+      };
+      _webSocketService.sendMessage(jsonEncode(message));
+    }
+  }
+
   void sendItemScan(String scannedItemQrCode) {
-    // We create a JSON message to send to the backend
-    final message = {
-      "type": "item_scanned",
-      "data": {"qr_code": scannedItemQrCode},
-    };
-    _webSocketService.sendMessage(jsonEncode(message));
+    if (_status == ConnectionStatus.connected) {
+        final message = {
+          "type": "item_scanned",
+          "data": {
+            "qr_code": scannedItemQrCode,
+          }
+        };
+        _webSocketService.sendMessage(jsonEncode(message));
+    }
   }
 
   void disconnect() {

@@ -57,16 +57,30 @@ class WebSocketManager:
                 if item_qr_code:
                     print(f"Received item_scanned for {item_qr_code} in session {session_id}")
                     updated_order = order_service.add_item_to_order(session_id, item_qr_code, db)
-
                     order_data = OrderSchema.from_orm(updated_order).model_dump()
-
-                    # Broadcast the update to all clients in the session
                     await self.broadcast_to_session({
                         "type": "order_update",
                         "data": order_data
                     }, session_id)
 
+            # --- NEW LOGIC TO HANDLE CREATING A BILL ---
+            elif message_type == "create_new_bill":
+                print(f"Received create_new_bill for session {session_id}")
+                new_order = order_service.create_order_for_session(session_id, db)
+
+                # Broadcast a message so the desktop knows a new bill was created
+                # For now, we'll just re-use the order_update message type
+                order_data = OrderSchema.from_orm(new_order).model_dump()
+                await self.broadcast_to_session({
+                    "type": "order_update", 
+                    "data": order_data
+                }, session_id)
+
+            else:
+                await self.broadcast_to_session({"error": "Unknown message type"}, session_id)
+
         except Exception as e:
             print(f"Error handling message: {e}")
+            await self.broadcast_to_session({"type": "error", "message": str(e)}, session_id)
         finally:
             db.close()

@@ -4,6 +4,20 @@ from sqlalchemy.orm import Session
 from .. import models
 from ..schemas import order as order_schema # <-- Corrected import
 
+def create_order_for_session(session_id: str, db: Session) -> models.order.Order:
+    """Creates a new, empty, pending order for a given session."""
+    desktop_session = db.query(models.session.DesktopSession).filter(models.session.DesktopSession.session_id == session_id).first()
+    if not desktop_session:
+        raise ValueError(f"Session {session_id} not found.")
+
+    # Create a new pending order for this session
+    new_order = models.order.Order(session_id=desktop_session.id, status='pending', total_amount=0)
+    db.add(new_order)
+    db.commit()
+    db.refresh(new_order)
+    print(f"Created new order {new_order.id} for session {session_id}")
+    return new_order
+
 def add_item_to_order(session_id: str, item_qr_code: str, db: Session) -> order_schema.Order: # <-- Use corrected schema
     # 1. Find the item in the database from its QR code
     item = db.query(models.item.Item).filter(models.item.Item.qr_code == item_qr_code).first()
