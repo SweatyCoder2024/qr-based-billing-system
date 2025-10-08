@@ -3,7 +3,6 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QFileDialog)
 from services.api_client import APIClient
-from services import label_printer_service
 from .item_dialog import ItemDialog
 from .qr_display_dialog import QRDisplayDialog
 
@@ -12,7 +11,7 @@ class ItemsTab(QWidget):
         super().__init__()
         
         self.api_client = api_client
-        self.items_cache = [] # Cache for holding all items
+        self.items_cache = []
         
         main_layout = QVBoxLayout(self)
         self.setLayout(main_layout)
@@ -23,15 +22,14 @@ class ItemsTab(QWidget):
         self.edit_button = QPushButton("Edit Item")
         self.delete_button = QPushButton("Delete Item")
         self.qr_button = QPushButton("Generate QR Code")
-        self.print_all_button = QPushButton("Print All QR Codes")
+        self.upload_button = QPushButton("Upload From File...")
 
         self.add_button.clicked.connect(self.open_add_item_dialog)
         self.edit_button.clicked.connect(self.open_edit_item_dialog)
         self.delete_button.clicked.connect(self.delete_selected_item)
         self.qr_button.clicked.connect(self.generate_item_qr)
-        self.print_all_button.clicked.connect(self.print_all_qrs)
-
-        # Disable buttons that require a selection by default
+        self.upload_button.clicked.connect(self.upload_file)
+        
         self.edit_button.setEnabled(False)
         self.delete_button.setEnabled(False)
         self.qr_button.setEnabled(False)
@@ -40,16 +38,13 @@ class ItemsTab(QWidget):
         control_layout.addWidget(self.edit_button)
         control_layout.addWidget(self.delete_button)
         control_layout.addWidget(self.qr_button)
+        control_layout.addWidget(self.upload_button)
         control_layout.addStretch()
-        control_layout.addWidget(self.print_all_button)
-
+        
         # --- Items Table ---
         self.table = QTableWidget()
         self.table.setColumnCount(7)
-        self.table.setHorizontalHeaderLabels([
-            "ID", "QR Code", "Name", "Retail Price", 
-            "Wholesale Price", "Stock", "Category"
-        ])
+        self.table.setHorizontalHeaderLabels(["ID", "QR Code", "Name", "Retail Price", "Wholesale Price", "Stock", "Category"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -64,8 +59,7 @@ class ItemsTab(QWidget):
     def load_items(self):
         """Fetch items from the API, populate the table, and cache the results."""
         self.items_cache = self.api_client.get_items(limit=2000)
-        self.table.setRowCount(0) # Clear existing rows
-        
+        self.table.setRowCount(0)
         for row_number, item in enumerate(self.items_cache):
             self.table.insertRow(row_number)
             self.table.setItem(row_number, 0, QTableWidgetItem(str(item.get("id"))))
@@ -75,8 +69,21 @@ class ItemsTab(QWidget):
             self.table.setItem(row_number, 4, QTableWidgetItem(str(item.get("wholesale_price"))))
             self.table.setItem(row_number, 5, QTableWidgetItem(str(item.get("stock_quantity"))))
             self.table.setItem(row_number, 6, QTableWidgetItem(item.get("category")))
-        
         self.update_button_states()
+
+    def upload_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open Item File", "", "Excel Files (*.xlsx);;CSV Files (*.csv)")
+        if file_path:
+            response = self.api_client.upload_items_file(file_path)
+            if response and "message" in response:
+                details = response.get('details', {})
+                created = details.get('created', 0)
+                updated = details.get('updated', 0)
+                QMessageBox.information(self, "Upload Complete", f"File processed successfully.\nCreated: {created}\nUpdated: {updated}")
+                self.load_items()
+            else:
+                error_detail = response.get("detail") if response else "An unknown error occurred."
+                QMessageBox.critical(self, "Upload Failed", f"Failed to process file: {error_detail}")
 
     def open_add_item_dialog(self):
         dialog = ItemDialog(self.api_client, parent=self)
@@ -85,7 +92,8 @@ class ItemsTab(QWidget):
 
     def open_edit_item_dialog(self):
         selected_items = self.table.selectedItems()
-        if not selected_items: return
+        if not selected_items:
+            return
         item_id = int(selected_items[0].text())
         item_data = self.api_client.get_item(item_id)
         if not item_data:
@@ -97,7 +105,8 @@ class ItemsTab(QWidget):
     
     def delete_selected_item(self):
         selected_items = self.table.selectedItems()
-        if not selected_items: return
+        if not selected_items:
+            return
         item_id = int(selected_items[0].text())
         item_name = selected_items[2].text()
         reply = QMessageBox.question(self, "Delete Item", 
@@ -105,7 +114,8 @@ class ItemsTab(QWidget):
                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                      QMessageBox.StandardButton.No)
         if reply == QMessageBox.StandardButton.Yes:
-            if self.api_client.delete_item(item_id):
+            success = self.api_client.delete_item(item_id)
+            if success:
                 QMessageBox.information(self, "Success", f"Item '{item_name}' was deleted.")
                 self.load_items()
             else:
@@ -119,7 +129,8 @@ class ItemsTab(QWidget):
         
     def generate_item_qr(self):
         selected_items = self.table.selectedItems()
-        if not selected_items: return
+        if not selected_items:
+            return
         item_id = int(selected_items[0].text())
         response = self.api_client.get_item_qr(item_id)
         if response and "qr_code_image" in response:
@@ -127,17 +138,3 @@ class ItemsTab(QWidget):
             dialog.exec()
         else:
             QMessageBox.critical(self, "Error", "Could not generate QR code from the server.")
-
-    def print_all_qrs(self):
-        if not self.items_cache:
-            QMessageBox.warning(self, "No Items", "There are no items to generate QR codes for.")
-            return
-
-        file_path, _ = QFileDialog.getSaveFileName(self, "Save QR Codes PDF", "", "PDF Files (*.pdf)")
-
-        if file_path:
-            try:
-                label_printer_service.generate_qr_pdf(self.items_cache, file_path)
-                QMessageBox.information(self, "Success", f"PDF with all QR codes has been saved to:\n{file_path}")
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to generate PDF: {e}")

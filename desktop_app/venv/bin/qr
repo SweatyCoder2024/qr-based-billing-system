@@ -1,4 +1,4 @@
-#!/home/atharva/Desktop/bill/desktop_app/venv/bin/python3.12
+#!/home/anveshna/Downloads/qr-based-billing-system/desktop_app/venv/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys

@@ -78,6 +78,20 @@ class APIClient:
         except requests.exceptions.RequestException as e:
             self._handle_error(e)
             return None
+        
+    def upload_items_file(self, file_path: str) -> Optional[Dict]:
+        """Uploads an item file (CSV or XLSX) to the backend."""
+        try:
+            with open(file_path, 'rb') as f:
+                files = {'file': (file_path.split('/')[-1], f)}
+                response = self.session.post(f"{self.base_url}/api/items/upload-file/", files=files)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            return self._handle_error(e)
+        except FileNotFoundError:
+            print(f"File not found at path: {file_path}")
+            return {"detail": "File not found on local machine."}
 
     # --- THIS IS THE MISSING FUNCTION ---
     def get_item_qr(self, item_id: int) -> Optional[Dict]:
